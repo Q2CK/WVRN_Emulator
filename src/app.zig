@@ -62,19 +62,17 @@ const CPU = union(CPUType) {
     }
 
     pub fn setQuery(self: *Self, query: []const u8, value: usize) Result {
-        switch(self.*) {
+        return switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.setQuery(query, value),
             .WVRN_Pico => |*cpu| cpu.setQuery(query, value)
-        }
-        return Result.ok();
+        };
     }
 
-    pub fn getQuery(self: *Self, query: []const u8, buffer: *std.ArrayList(u8)) Result {
-        switch(self.*) {
-            .WVRN_Nano => |*cpu| cpu.getQuery(query, buffer),
-            .WVRN_Pico => |*cpu| cpu.getQuery(query, buffer)
-        }
-        return Result.ok();
+    pub fn getQuery(self: *Self, alloc: std.mem.Allocator, query: []const[]const u8, buffer: *[]u8) Result {
+        return switch(self.*) {
+            .WVRN_Nano => |*cpu| cpu.getQuery(alloc, query, buffer),
+            .WVRN_Pico => |*cpu| cpu.getQuery(alloc, query, buffer)
+        };
     }
 
     pub fn setStatus(self: *Self, status: Status) void {
@@ -234,7 +232,6 @@ pub fn run() !void {
             return;
         } else if(std.mem.eql(u8, command, "help")) {
             const help_string: []const[]const u8 = &.{
-                "",
                 "\x1b[0mAvailable commands:",
                 "",
                 "    \x1b[96mhelp \x1b[0m- print available commands",
@@ -300,12 +297,16 @@ pub fn run() !void {
                     try printReport(stdout, .Error, "No program file loaded", .{});
                 }
             } else if(params.len == 1) {
-                const parsed_int = std.fmt.parseInt(usize, params[0], 0) catch {
-                    try printReport(stdout, .Error, "Failed to parse the provided number of ticks", .{});
-                    continue :main_loop;
-                };
-                app_context.cpu.nTicks(parsed_int);
-                try printReport(stdout, .Success, "Executed \x1b[96m{d}\x1b[0m clock cycle(s)", .{parsed_int});
+                if(app_context.program_file) |_| {
+                    const parsed_int = std.fmt.parseInt(usize, params[0], 0) catch {
+                        try printReport(stdout, .Error, "Failed to parse the provided number of ticks", .{});
+                        continue :main_loop;
+                    };
+                    app_context.cpu.nTicks(parsed_int);
+                    try printReport(stdout, .Success, "Executed \x1b[96m{d}\x1b[0m clock cycle(s)", .{parsed_int});
+                } else {
+                    try printReport(stdout, .Error, "No program file loaded", .{});
+                }
             } else {
                 try printReport(stdout, .Error, "Expected 0 or 1 parameter(s), got {d}", .{params.len});
                 continue :main_loop;
@@ -342,6 +343,22 @@ pub fn run() !void {
                 }
             } else {
                 try printReport(stdout, .Error, "Expected 0 parameters, got {d}", .{params.len});
+                continue :main_loop;
+            }
+        } else if(std.mem.eql(u8, command, "get")) {
+            if(params.len > 0) {
+                var buffer: []u8 = &.{};
+                switch(app_context.cpu.getQuery(alloc, params,&buffer)) {
+                    .Ok => {
+                        try printReport(stdout, .Success, "{s}", .{buffer});
+                        alloc.free(buffer);
+                    },
+                    .Err => |msg| {
+                        try printReport(stdout, .Error, "{s}", .{msg});
+                    }
+                }
+            } else {
+                try printReport(stdout, .Error, "Expected more than 0 parameters, got {d}", .{params.len});
                 continue :main_loop;
             }
         } else {

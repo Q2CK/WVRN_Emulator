@@ -60,15 +60,133 @@ pub const CPU = struct {
     }
 
     pub fn setQuery(self: *Self, query: []const u8, value: usize) Result {
-        _ = self;
-        _ = query;
-        _ = value;
+        var tokens_iterator = std.mem.tokenizeAny(u8, query, " \n\t");
+
+        var tokens_list = std.ArrayList([]const u8).init();
+        defer tokens_list.deinit();
+
+        while(tokens_iterator.next()) |token| {
+            tokens_list.append(token);
+        }
+
+        if(tokens_list.items.len < 1) {
+            return Result.errStatic("Empty query");
+        }
+
+        const n_args = tokens_list.items.len - 1;
+
+        const device = tokens_list.items[0];
+        const params = tokens_list.items[1..];
+
+        if(std.mem.eql(u8, device, "reg")) {
+            if(n_args == 1) {
+                const reg_name = params[0];
+                if(std.mem.startsWith(u8, reg_name, 'r')) {
+                    const reg_number = std.fmt.parseInt(u5, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
+                    self.registers.set(reg_number, value);
+                } else if(std.mem.eql(u8, reg_name, "zero")) {
+                    
+                } else if(std.mem.eql(u8, reg_name, "acc")) {
+                    self.registers.set(1, value);
+                } else if(std.mem.eql(u8, reg_name, "flg")) {
+                    self.registers.set(2, value);
+                } else if(std.mem.eql(u8, reg_name, "seg")) {
+                    self.registers.set(3, value);
+                } else if(std.mem.eql(u8, reg_name, "tr1")) {
+                    self.registers.set(4, value);
+                } else if(std.mem.eql(u8, reg_name, "tr2")) {
+                    self.registers.set(5, @truncate(value));
+                }
+            } else {
+                return Result.errStatic("'reg' query expects 1 register index parameter");
+            }
+        } else if(std.mem.eql(u8, device, "mem")) {
+            if(n_args == 1) {
+                const address_string = params[0];
+                const address = std.fmt.parseInt(u16, address_string, 0) catch return Result.errStatic("Failed to parse register name");
+                self.memory.set(address, @truncate(value));
+            } else {
+                return Result.errStatic("'mem' query expects 1 memory address parameter");
+            }
+        } else if(std.mem.eql(u8, device, "pc")) {
+            if(n_args == 0) {
+                self.program_counter = @truncate(value);
+            } else {
+                return Result.errStatic("'pc' query expects no parameters");
+            }
+        } else {
+            return Result.errStatic("No such CPU component");
+        }
     }
 
-    pub fn getQuery(self: *Self, query: []const u8, buffer: *std.ArrayList(u8)) Result {
-        _ = self;
-        _ = query;
-        _ = buffer;
+    pub fn getQuery(self: *Self, alloc: std.mem.Allocator, query: []const[]const u8, buffer: *[]u8) Result {
+        if(query.len < 1) {
+            return Result.errStatic("Empty query");
+        }
+
+        const n_args = query.len - 1;
+
+        const device = query[0];
+        const params = query[1..];
+
+        if(std.mem.eql(u8, device, "reg")) {
+            if(n_args == 1) {
+                const reg_name = std.mem.trim(u8, params[0], " \n\t\r");
+                if(std.mem.startsWith(u8, reg_name, "r")) {
+                    const reg_number = std.fmt.parseInt(u5, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
+                    const reg_value = self.registers.get(@truncate(reg_number));
+                    buffer.* = std.fmt.allocPrint(alloc, "r{d} = \x1b[96m{d}\x1b[0m", .{reg_number, reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else if(std.mem.eql(u8, reg_name, "zero")) {
+                    buffer.* = std.fmt.allocPrint(alloc, "zero= \x1b[96m0\x1b[0m", .{}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else if(std.mem.eql(u8, reg_name, "acc")) {
+                    const reg_value = self.registers.get(1);
+                    buffer.* = std.fmt.allocPrint(alloc, "acc = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else if(std.mem.eql(u8, reg_name, "flg")) {
+                    const reg_value = self.registers.get(2);
+                    buffer.* = std.fmt.allocPrint(alloc, "flg= \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else if(std.mem.eql(u8, reg_name, "seg")) {
+                    const reg_value = self.registers.get(3);
+                    buffer.* = std.fmt.allocPrint(alloc, "seg = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else if(std.mem.eql(u8, reg_name, "tr1")) {
+                    const reg_value = self.registers.get(4);
+                    buffer.* = std.fmt.allocPrint(alloc, "tr1 = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else if(std.mem.eql(u8, reg_name, "tr2")) {
+                    const reg_value = self.registers.get(5);
+                    buffer.* = std.fmt.allocPrint(alloc, "tr1 = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    return Result.ok();
+                } else {
+                    return Result.errStatic("Failed to parse register name");
+                }
+            } else {
+                return Result.errStatic("'reg' query expects 1 register index parameter");
+            }
+        } else if(std.mem.eql(u8, device, "mem")) {
+            if(n_args == 1) {
+                const address_string = params[0];
+                const address = std.fmt.parseInt(u16, address_string, 0) catch return Result.errStatic("Failed to parse register name");
+                const mem_value = self.memory.get(address);
+                buffer.* = std.fmt.allocPrint(alloc, "mem[{d}] = \x1b[96m{d}\x1b[0m", .{address, mem_value}) catch return Result.errStatic("Failed to allocate buffer");
+                return Result.ok();
+            } else {
+                return Result.errStatic("'mem' query expects 1 memory address parameter");
+            }
+        } else if(std.mem.eql(u8, device, "pc")) {
+            if(n_args == 0) {
+                const pc_value = self.program_counter;
+                buffer.* = std.fmt.allocPrint(alloc, "pc = \x1b[96m{d}\x1b[0m", .{pc_value}) catch return Result.errStatic("Failed to allocate buffer");
+                return Result.ok();
+            } else {
+                return Result.errStatic("'pc' query expects no parameters");
+            }
+        } else {
+            return Result.errStatic("No such CPU component");
+        }
     }
 
     fn instrExt(self: *Self, operand: u5) void {
@@ -84,12 +202,6 @@ pub const CPU = struct {
         const temp = self.registers.get(operand);
         self.registers.set(operand, self.registers.accumulator);
         self.registers.accumulator = temp;
-
-        self.registers.flags.flags.parity = @truncate(self.registers.accumulator);
-        self.registers.flags.flags.not_zero = if(self.registers.accumulator == 0) 0 else 1;
-        self.registers.flags.flags.sign = @truncate(self.registers.accumulator >> 7);
-        self.registers.flags.flags.carry = 0;
-        self.registers.flags.flags.overflow = 0;
 
         self.program_counter += 1;
     }
