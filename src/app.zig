@@ -68,10 +68,10 @@ const CPU = union(CPUType) {
         };
     }
 
-    pub fn getQuery(self: *Self, alloc: std.mem.Allocator, query: []const[]const u8, buffer: *[]u8) Result {
+    pub fn getQuery(self: *Self, query: []const[]const u8, buffer: *std.ArrayList(u8)) Result {
         return switch(self.*) {
-            .WVRN_Nano => |*cpu| cpu.getQuery(alloc, query, buffer),
-            .WVRN_Pico => |*cpu| cpu.getQuery(alloc, query, buffer)
+            .WVRN_Nano => |*cpu| cpu.getQuery(query, buffer),
+            .WVRN_Pico => |*cpu| cpu.getQuery(query, buffer)
         };
     }
 
@@ -347,11 +347,11 @@ pub fn run() !void {
             }
         } else if(std.mem.eql(u8, command, "get")) {
             if(params.len > 0) {
-                var buffer: []u8 = &.{};
-                switch(app_context.cpu.getQuery(alloc, params,&buffer)) {
+                var buffer = std.ArrayList(u8).init(alloc);
+                defer buffer.deinit();
+                switch(app_context.cpu.getQuery(params,&buffer)) {
                     .Ok => {
-                        try printReport(stdout, .Success, "{s}", .{buffer});
-                        alloc.free(buffer);
+                        try printReport(stdout, .Success, "{s}", .{buffer.items});
                     },
                     .Err => |msg| {
                         try printReport(stdout, .Error, "{s}", .{msg});

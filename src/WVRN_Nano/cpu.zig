@@ -79,9 +79,8 @@ pub const CPU = struct {
         return Result.ok();
     }
 
-    pub fn getQuery(self: *Self, alloc: std.mem.Allocator, query: []const[]const u8, buffer: *[]u8) Result {
+    pub fn getQuery(self: *Self, query: []const[]const u8, buffer: *std.ArrayList(u8)) Result {
         _ = self;
-        _ = alloc;
         _ = query;
         _ = buffer;
 

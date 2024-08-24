@@ -13,5 +13,6 @@ pub const Instruction = packed struct {
     const Self = @This();
 
     opcode: Opcode,
-    operand5bit: u5,
+    flag_update: u1,
+    operand: u4,
 };

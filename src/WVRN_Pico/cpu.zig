@@ -41,15 +41,17 @@ pub const CPU = struct {
 
         const instr: Instruction = @bitCast(instr_byte);
 
+        std.debug.print("{}", .{instr});
+
         switch(instr.opcode) {
-            .EXT  => self.instrExt(instr.operand5bit),
-            .SWA  => self.instrSwa(instr.operand5bit),
-            .ADD  => self.instrAdd(instr.operand5bit),
-            .ADDI => self.instrAddi(instr.operand5bit),
-            .NAND => self.instrNand(instr.operand5bit),
-            .LD   => self.instrLd(instr.operand5bit),
-            .ST   => self.instrSt(instr.operand5bit),
-            .B    => self.instrB(instr.operand5bit),
+            .EXT  => self.instrExt(instr.operand),
+            .SWA  => self.instrSwa(instr.operand),
+            .ADD  => self.instrAdd(instr.operand),
+            .ADDI => self.instrAddi(instr.operand),
+            .NAND => self.instrNand(instr.operand),
+            .LD   => self.instrLd(instr.operand),
+            .ST   => self.instrSt(instr.operand),
+            .B    => self.instrB(instr.operand),
         }
     }
 
@@ -75,7 +77,7 @@ pub const CPU = struct {
                 const value_string = params[1];
                 const value = std.fmt.parseInt(u8, value_string, 0) catch return Result.errStatic("Failed to parse numeric value");
                 if(std.mem.startsWith(u8, reg_name, "r")) {
-                    const reg_number = std.fmt.parseInt(u5, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
+                    const reg_number = std.fmt.parseInt(u4, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
                     self.registers.set(reg_number, value);
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "zero")) {
@@ -126,7 +128,9 @@ pub const CPU = struct {
         }
     }
 
-    pub fn getQuery(self: *Self, alloc: std.mem.Allocator, query: []const[]const u8, buffer: *[]u8) Result {
+    pub fn getQuery(self: *Self, query: []const[]const u8, buffer: *std.ArrayList(u8)) Result {
+        var writer = buffer.*.writer();
+
         if(query.len < 1) {
             return Result.errStatic("Empty query");
         }
@@ -140,32 +144,32 @@ pub const CPU = struct {
             if(n_args == 1) {
                 const reg_name = std.mem.trim(u8, params[0], " \n\t\r");
                 if(std.mem.startsWith(u8, reg_name, "r")) {
-                    const reg_number = std.fmt.parseInt(u5, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
-                    const reg_value = self.registers.get(@truncate(reg_number));
-                    buffer.* = std.fmt.allocPrint(alloc, "r{d} = \x1b[96m{d}\x1b[0m", .{reg_number, reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    const reg_number = std.fmt.parseInt(u4, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
+                    const reg_value = self.registers.get(reg_number);
+                    writer.print("r{d} = \x1b[96m{d}\x1b[0m", .{reg_number, reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "zero")) {
-                    buffer.* = std.fmt.allocPrint(alloc, "zero= \x1b[96m0\x1b[0m", .{}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("zero= \x1b[96m0\x1b[0m", .{}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "acc")) {
                     const reg_value = self.registers.get(1);
-                    buffer.* = std.fmt.allocPrint(alloc, "acc = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("acc = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "flg")) {
                     const reg_value = self.registers.get(2);
-                    buffer.* = std.fmt.allocPrint(alloc, "flg= \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("flg= \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "seg")) {
                     const reg_value = self.registers.get(3);
-                    buffer.* = std.fmt.allocPrint(alloc, "seg = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("seg = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "tr1")) {
                     const reg_value = self.registers.get(4);
-                    buffer.* = std.fmt.allocPrint(alloc, "tr1 = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("tr1 = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "tr2")) {
                     const reg_value = self.registers.get(5);
-                    buffer.* = std.fmt.allocPrint(alloc, "tr1 = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("tr1 = \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else {
                     return Result.errStatic("Failed to parse register name");
@@ -173,20 +177,64 @@ pub const CPU = struct {
             } else {
                 return Result.errStatic("'reg' query expects 1 register index parameter");
             }
+        } else if(std.mem.eql(u8, device, "regs")) {
+            if(n_args == 0) {
+                writer.print("\x1b[0m\n", .{}) catch return Result.errStatic("Failed to allocate buffer");
+                writer.print("\x1b[0mr0/zero = \x1b[96m0\n", .{}) catch return Result.errStatic("Failed to allocate buffer");
+                writer.print("\x1b[0mr1/acc  = \x1b[96m{d}\n", .{self.registers.accumulator}) catch return Result.errStatic("Failed to allocate buffer");
+                writer.print("\x1b[0mr2/flg  = \x1b[96m{b}\n", .{self.registers.flags.byte}) catch return Result.errStatic("Failed to allocate buffer");
+                writer.print("\x1b[0mr3/seg  = \x1b[96m{d}\n", .{self.registers.segment}) catch return Result.errStatic("Failed to allocate buffer");
+
+                for(4..28) |i| {
+                    writer.print("\x1b[0mr{d: <2} = \x1b[96m{d: <3}", .{i, self.registers.get(@intCast(i))}) catch return Result.errStatic("Failed to allocate buffer");
+
+                    if(i % 4 == 3) {
+                        writer.print("\n", .{}) catch return Result.errStatic("Failed to allocate buffer");
+                    } else {
+                        writer.print(" ", .{}) catch return Result.errStatic("Failed to allocate buffer");
+                    }
+                }
+
+                return Result.ok();
+            } else {
+                return Result.errStatic("'regs' query expects no parameters");
+            }
         } else if(std.mem.eql(u8, device, "mem")) {
             if(n_args == 1) {
                 const address_string = params[0];
-                const address = std.fmt.parseInt(u16, address_string, 0) catch return Result.errStatic("Failed to parse register name");
-                const mem_value = self.memory.get(address);
-                buffer.* = std.fmt.allocPrint(alloc, "mem[{d}] = \x1b[96m{d}\x1b[0m", .{address, mem_value}) catch return Result.errStatic("Failed to allocate buffer");
+                const address = std.fmt.parseInt(usize, address_string, 0) catch return Result.errStatic("Failed to parse address");
+                if(address > 65535) {
+                    return Result.errStatic("Address out of range: <0; 65535>");
+                }
+                const mem_value = self.memory.get(@truncate(address));
+                writer.print("mem[{d}] = \x1b[96m{d}\x1b[0m", .{address, mem_value}) catch return Result.errStatic("Failed to allocate buffer");
+                return Result.ok();
+            } if(n_args == 2) {
+                const start_address_string = params[0];
+                const end_address_string = params[1];
+                const start_address = std.fmt.parseInt(usize, start_address_string, 0) catch return Result.errStatic("Failed to parse address");
+                const end_addres = std.fmt.parseInt(usize, end_address_string, 0) catch return Result.errStatic("Failed to parse address");
+                if(start_address > 65535 or end_addres > 65535) {
+                    return Result.errStatic("Address out of range: <0; 65535>");
+                }
+                if(end_addres < start_address) {
+                    return Result.errStatic("Start address larger than end address");
+                }
+                var address: usize = start_address;
+                while(address <= end_addres) {
+                    const mem_value = self.memory.get(@truncate(address));
+                    writer.print("\nmem[{d}] = \x1b[96m{d}\x1b[0m", .{address, mem_value}) catch return Result.errStatic("Failed to allocate buffer");
+
+                    address +%= 1;
+                }
                 return Result.ok();
             } else {
-                return Result.errStatic("'mem' query expects 1 memory address parameter");
+                return Result.errStatic("'mem' query expects 1 or 2 memory address parameters");
             }
         } else if(std.mem.eql(u8, device, "pc")) {
             if(n_args == 0) {
                 const pc_value = self.program_counter;
-                buffer.* = std.fmt.allocPrint(alloc, "pc = \x1b[96m{d}\x1b[0m", .{pc_value}) catch return Result.errStatic("Failed to allocate buffer");
+                writer.print("pc = \x1b[96m{d}\x1b[0m", .{pc_value}) catch return Result.errStatic("Failed to allocate buffer");
                 return Result.ok();
             } else {
                 return Result.errStatic("'pc' query expects no parameters");
@@ -196,7 +244,7 @@ pub const CPU = struct {
         }
     }
 
-    fn instrExt(self: *Self, operand: u5) void {
+    fn instrExt(self: *Self, operand: u4) void {
         if(operand == 1) {
             self.status = .Pause;
             self.program_counter += 1;
@@ -205,7 +253,7 @@ pub const CPU = struct {
         }
     }
 
-    fn instrSwa(self: *Self, operand: u5) void {
+    fn instrSwa(self: *Self, operand: u4) void {
         const temp = self.registers.get(operand);
         self.registers.set(operand, self.registers.accumulator);
         self.registers.accumulator = temp;
@@ -213,7 +261,7 @@ pub const CPU = struct {
         self.program_counter += 1;
     }
 
-    fn instrAdd(self: *Self, operand: u5) void {
+    fn instrAdd(self: *Self, operand: u4) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
             self.registers.get(operand),
@@ -221,10 +269,12 @@ pub const CPU = struct {
             &self.registers.flags
         );
 
+        std.debug.print("\ncarry: {d}", .{self.registers.flags.flags.carry});
+
         self.program_counter += 1;
     }
 
-    fn instrAddi(self: *Self, operand: u5) void {
+    fn instrAddi(self: *Self, operand: u4) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
             bin_ops.signExtendu5u8(operand),
@@ -235,7 +285,7 @@ pub const CPU = struct {
         self.program_counter += 1;
     }
 
-    fn instrNand(self: *Self, operand: u5) void {
+    fn instrNand(self: *Self, operand: u4) void {
         const carry = self.registers.flags.flags.carry;
         bin_ops.nandWithFlags(
             self.registers.accumulator + @as(u8, carry),
@@ -248,7 +298,7 @@ pub const CPU = struct {
     }
 
 
-    fn instrLd(self: *Self, operand: u5) void {
+    fn instrLd(self: *Self, operand: u4) void {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
 
         const mem_value = self.memory.get(address);
@@ -262,7 +312,7 @@ pub const CPU = struct {
         self.program_counter += 2;
     }
 
-    fn instrSt(self: *Self, operand: u5) void {
+    fn instrSt(self: *Self, operand: u4) void {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
 
         self.memory.set(address, self.registers.accumulator);
@@ -270,31 +320,30 @@ pub const CPU = struct {
         self.program_counter += 2;
     }
 
-    fn instrB(self: *Self, operand: u5) void {
+    fn instrB(self: *Self, operand: u4) void {
         const flags = self.registers.flags.flags;
 
         const condition_met: bool = switch(operand) {
-            0b00000 => false,
-            0b00001 => true,
-            0b00010 => flags.a == 0,
-            0b00011 => flags.a == 1,
-            0b00100 => flags.b == 0,
-            0b00101 => flags.b == 1,
-            0b00110 => flags.parity == 0,
-            0b00111 => flags.parity == 1,
-            0b01000 => flags.not_zero == 0,
-            0b01001 => flags.not_zero == 1,
-            0b01010 => flags.sign == 0,
-            0b01011 => flags.sign == 1,
-            0b01100 => flags.carry == 0,
-            0b01101 => flags.carry == 1,
-            0b01110 => flags.overflow == 0,
-            0b01111 => flags.overflow == 1,
-            else => false
+            0b0000 => false,
+            0b0001 => true,
+            0b0010 => flags.a == 0,
+            0b0011 => flags.a == 1,
+            0b0100 => flags.b == 0,
+            0b0101 => flags.b == 1,
+            0b0110 => flags.parity == 0,
+            0b0111 => flags.parity == 1,
+            0b1000 => flags.not_zero == 0,
+            0b1001 => flags.not_zero == 1,
+            0b1010 => flags.sign == 0,
+            0b1011 => flags.sign == 1,
+            0b1100 => flags.carry == 0,
+            0b1101 => flags.carry == 1,
+            0b1110 => flags.overflow == 0,
+            0b1111 => flags.overflow == 1,
         };
 
         if(condition_met) {
-             self.program_counter = ((@as(u16, self.registers.segment) << 8) | (@as(u16, self.registers.get(operand))));
+             self.program_counter = ((@as(u16, self.registers.segment) << 8) | (@as(u16, self.registers.accumulator)));
         } else {
             self.program_counter += 1;
         }
