@@ -36,7 +36,7 @@ pub const CPU = struct {
         self.registers.reset();
     }
 
-    pub fn tick(self: *Self) void {
+    pub inline fn tick(self: *Self) void {
         const instr_byte = self.memory.get(self.program_counter);
 
         const instr: Instruction = @bitCast(instr_byte);
@@ -141,13 +141,32 @@ pub const CPU = struct {
         } else if(std.mem.eql(u8, device, "mem")) {
             if(n_args == 2) {
                 const address_string = params[0];
-                const value_string = params[0];
+                const value_string = params[1];
                 const address = std.fmt.parseInt(u16, address_string, 0) catch return Result.errStatic("Failed to parse register name");
                 const value = std.fmt.parseInt(u8, value_string, 0) catch return Result.errStatic("Failed to parse numeric value");
                 self.memory.set(address, value);
                 return Result.ok();
+            } else if(n_args == 3) {
+                const start_address_string = params[0];
+                const end_address_string = params[1];
+                const value_string = params[2];
+                const start_address = std.fmt.parseInt(usize, start_address_string, 0) catch return Result.errStatic("Failed to parse address");
+                const end_addres = std.fmt.parseInt(usize, end_address_string, 0) catch return Result.errStatic("Failed to parse address");
+                const value = std.fmt.parseInt(u8, value_string, 0) catch return Result.errStatic("Failed to parse numeric value");
+                if(start_address > 65535 or end_addres > 65535) {
+                    return Result.errStatic("Address out of range: <0; 65535>");
+                }
+                if(end_addres < start_address) {
+                    return Result.errStatic("Start address is larger than end address");
+                }
+                var address: usize = start_address;
+                while(address <= end_addres) {
+                    self.memory.set(@truncate(address), value);
+                    address +%= 1;
+                }
+                return Result.ok();
             } else {
-                return Result.errStatic("'mem' query expects 1 memory address parameter and 1 value");
+                return Result.errStatic("'mem' query expects 1 memory address parameter and 1 value, or a memory range and a value");
             }
         } else if(std.mem.eql(u8, device, "pc")) {
             if(n_args == 1) {
@@ -253,7 +272,7 @@ pub const CPU = struct {
                     return Result.errStatic("Address out of range: <0; 65535>");
                 }
                 if(end_addres < start_address) {
-                    return Result.errStatic("Start address larger than end address");
+                    return Result.errStatic("Start address is larger than end address");
                 }
                 var address: usize = start_address;
                 while(address <= end_addres) {
@@ -279,7 +298,7 @@ pub const CPU = struct {
         }
     }
 
-    fn instrExt(self: *Self, operand: u4) void {
+    inline fn instrExt(self: *Self, operand: u4) void {
         if(operand == 1) {
             self.status = .Pause;
             self.program_counter += 1;
@@ -288,7 +307,7 @@ pub const CPU = struct {
         }
     }
 
-    fn instrSwa(self: *Self, operand: u4, flag_update: u1) void {
+    inline fn instrSwa(self: *Self, operand: u4, flag_update: u1) void {
         const temp = self.registers.get(operand);
         self.registers.set(operand, self.registers.accumulator);
         self.registers.accumulator = temp;
@@ -304,7 +323,7 @@ pub const CPU = struct {
         self.program_counter += 1;
     }
 
-    fn instrAdd(self: *Self, operand: u4, flag_update: u1) void {
+    inline fn instrAdd(self: *Self, operand: u4, flag_update: u1) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
             self.registers.get(operand),
@@ -316,7 +335,7 @@ pub const CPU = struct {
         self.program_counter += 1;
     }
 
-    fn instrAddi(self: *Self, operand: u4, flag_update: u1) void {
+    inline fn instrAddi(self: *Self, operand: u4, flag_update: u1) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
             bin_ops.signExtendu5u8(operand),
@@ -328,7 +347,7 @@ pub const CPU = struct {
         self.program_counter += 1;
     }
 
-    fn instrNand(self: *Self, operand: u4, flag_update: u1) void {
+    inline fn instrNand(self: *Self, operand: u4, flag_update: u1) void {
         const carry = self.registers.flags.flags.carry;
         bin_ops.nandWithFlags(
             self.registers.accumulator + @as(u8, carry),
@@ -342,7 +361,7 @@ pub const CPU = struct {
     }
 
 
-    fn instrLd(self: *Self, operand: u4, flag_update: u1) void {
+    inline fn instrLd(self: *Self, operand: u4, flag_update: u1) void {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
 
         const mem_value = self.memory.get(address);
@@ -359,14 +378,14 @@ pub const CPU = struct {
         self.program_counter += 1;
     }
 
-    fn instrSt(self: *Self, operand: u4) void {
+    inline fn instrSt(self: *Self, operand: u4) void {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
         self.memory.set(address, self.registers.accumulator);
 
         self.program_counter += 1;
     }
 
-    fn instrB(self: *Self, operand: u4) void {
+    inline fn instrB(self: *Self, operand: u4) void {
         const flags = self.registers.flags.flags;
 
         const condition_met: bool = switch(operand) {

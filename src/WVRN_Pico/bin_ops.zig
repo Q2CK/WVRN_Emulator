@@ -64,7 +64,7 @@ pub inline fn rshWithFlags(src: u8, result: *u8, flags: *Flags, flag_update: u1)
     result.* = result_8bit;
 }
 
-pub fn signExtendu5u8(value: u5) u8 {
+pub inline fn signExtendu5u8(value: u5) u8 {
     return if(value & 0x10 == 0) @as(u8, value) else 0xE0 | @as(u8, value);
 }
 

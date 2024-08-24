@@ -251,8 +251,8 @@ pub fn run() !void {
                 "    \x1b[96mrun \x1b[0m         - run the emulator continuously until nearest breakpoint or halt instruction",
                 "    \x1b[96mreset \x1b[0m       - reset the entire state of the emulator",
                 "",
-                "    \x1b[96mset \x1b[0m<query> <value> - manually set the state of a CPU component",
-                "    \x1b[96mget \x1b[0m<query>         - read the state of a CPU component",
+                "    \x1b[96mset \x1b[0m<query>  - manually set the state of a CPU component",
+                "    \x1b[96mget \x1b[0m<query>  - read the state of a CPU component",
                 "",
                 "<param> - obligatory parameter, [param] - optional parameter",
                 ""
