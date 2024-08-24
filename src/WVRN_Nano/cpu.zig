@@ -72,10 +72,9 @@ pub const CPU = struct {
 
     }
 
-    pub fn setQuery(self: *Self, query: []const u8, value: usize) Result {
+    pub fn setQuery(self: *Self, query: []const[]const u8) Result {
         _ = self;
         _ = query;
-        _ = value;
 
         return Result.ok();
     }

@@ -59,58 +59,65 @@ pub const CPU = struct {
         }
     }
 
-    pub fn setQuery(self: *Self, query: []const u8, value: usize) Result {
-        var tokens_iterator = std.mem.tokenizeAny(u8, query, " \n\t");
-
-        var tokens_list = std.ArrayList([]const u8).init();
-        defer tokens_list.deinit();
-
-        while(tokens_iterator.next()) |token| {
-            tokens_list.append(token);
-        }
-
-        if(tokens_list.items.len < 1) {
+    pub fn setQuery(self: *Self, query: []const[]const u8) Result {
+        if(query.len < 1) {
             return Result.errStatic("Empty query");
         }
 
-        const n_args = tokens_list.items.len - 1;
+        const n_args = query.len - 1;
 
-        const device = tokens_list.items[0];
-        const params = tokens_list.items[1..];
+        const device = query[0];
+        const params = query[1..];
 
         if(std.mem.eql(u8, device, "reg")) {
-            if(n_args == 1) {
+            if(n_args == 2) {
                 const reg_name = params[0];
-                if(std.mem.startsWith(u8, reg_name, 'r')) {
+                const value_string = params[1];
+                const value = std.fmt.parseInt(u8, value_string, 0) catch return Result.errStatic("Failed to parse numeric value");
+                if(std.mem.startsWith(u8, reg_name, "r")) {
                     const reg_number = std.fmt.parseInt(u5, reg_name[1..], 0) catch return Result.errStatic("Failed to parse register name");
                     self.registers.set(reg_number, value);
+                    return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "zero")) {
-                    
+                    return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "acc")) {
                     self.registers.set(1, value);
+                    return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "flg")) {
                     self.registers.set(2, value);
+                    return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "seg")) {
                     self.registers.set(3, value);
+                    return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "tr1")) {
                     self.registers.set(4, value);
+                    return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "tr2")) {
                     self.registers.set(5, @truncate(value));
+                    return Result.ok();
+                } else {
+                    return Result.errStatic("Failed to parse register name");
                 }
             } else {
-                return Result.errStatic("'reg' query expects 1 register index parameter");
+                return Result.errStatic("'reg' query expects 1 register index parameter and 1 value");
             }
         } else if(std.mem.eql(u8, device, "mem")) {
-            if(n_args == 1) {
+            if(n_args == 2) {
                 const address_string = params[0];
+                const value_string = params[0];
                 const address = std.fmt.parseInt(u16, address_string, 0) catch return Result.errStatic("Failed to parse register name");
-                self.memory.set(address, @truncate(value));
+                const value = std.fmt.parseInt(u8, value_string, 0) catch return Result.errStatic("Failed to parse numeric value");
+                self.memory.set(address, value);
+                return Result.ok();
             } else {
-                return Result.errStatic("'mem' query expects 1 memory address parameter");
+                return Result.errStatic("'mem' query expects 1 memory address parameter and 1 value");
             }
         } else if(std.mem.eql(u8, device, "pc")) {
-            if(n_args == 0) {
-                self.program_counter = @truncate(value);
+            if(n_args == 1) {
+                const value_string = params[0];
+                const value = std.fmt.parseInt(u16, value_string, 0) catch return Result.errStatic("Failed to parse numeric value");
+                self.program_counter = value;
+                return Result.ok();
             } else {
                 return Result.errStatic("'pc' query expects no parameters");
             }

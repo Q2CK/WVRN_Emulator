@@ -61,10 +61,10 @@ const CPU = union(CPUType) {
         }
     }
 
-    pub fn setQuery(self: *Self, query: []const u8, value: usize) Result {
+    pub fn setQuery(self: *Self, query: []const[]const u8) Result {
         return switch(self.*) {
-            .WVRN_Nano => |*cpu| cpu.setQuery(query, value),
-            .WVRN_Pico => |*cpu| cpu.setQuery(query, value)
+            .WVRN_Nano => |*cpu| cpu.setQuery(query),
+            .WVRN_Pico => |*cpu| cpu.setQuery(query)
         };
     }
 
@@ -352,6 +352,20 @@ pub fn run() !void {
                     .Ok => {
                         try printReport(stdout, .Success, "{s}", .{buffer});
                         alloc.free(buffer);
+                    },
+                    .Err => |msg| {
+                        try printReport(stdout, .Error, "{s}", .{msg});
+                    }
+                }
+            } else {
+                try printReport(stdout, .Error, "Expected more than 0 parameters, got {d}", .{params.len});
+                continue :main_loop;
+            }
+        } else if(std.mem.eql(u8, command, "set")) {
+            if(params.len > 0) {
+                switch(app_context.cpu.setQuery(params)) {
+                    .Ok => {
+                        try printReport(stdout, .Success, "Changed component state", .{});
                     },
                     .Err => |msg| {
                         try printReport(stdout, .Error, "{s}", .{msg});
