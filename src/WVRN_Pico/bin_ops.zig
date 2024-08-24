@@ -80,6 +80,16 @@ test "operations with flags" {
     try expect(flg.flags.carry == 0);
     try expect(flg.flags.overflow == 0);
 
+    addWithFlags(255, 1, &res, &flg, 1);
+    try expect(res == 0);
+    try expect(flg.flags.not_zero == 0);
+    try expect(flg.flags.parity == 0);
+    try expect(flg.flags.sign == 0);
+    try expect(flg.flags.carry == 1);
+    try expect(flg.flags.overflow == 0);
+
+    std.debug.print("{b:0>8}", .{flg.byte});
+
     addWithFlags(2, 3, &res, &flg, 1);
     try expect(res == 5);
     try expect(flg.flags.not_zero == 1);

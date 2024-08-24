@@ -72,7 +72,7 @@ pub const CPU = struct {
             .ADDI => writer.print("addi{s} {d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
             .NAND => writer.print("nand{s} r{d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
             .LD   => writer.print("ld{s} r{d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
-            .ST   => writer.print("st {d}", .{instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .ST   => writer.print("st r{d}", .{instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
             .B    => writer.print("b {s}", .{switch(instr.operand) {
                 0b0000 => "false",
                 0b0001 => "true",
@@ -217,7 +217,7 @@ pub const CPU = struct {
                 writer.print("\x1b[0m\n", .{}) catch return Result.errStatic("Failed to allocate buffer");
                 writer.print("\x1b[0mr0/zero = \x1b[96m0\n", .{}) catch return Result.errStatic("Failed to allocate buffer");
                 writer.print("\x1b[0mr1/acc  = \x1b[96m{d}\n", .{self.registers.accumulator}) catch return Result.errStatic("Failed to allocate buffer");
-                writer.print("\x1b[0mr2/flg  = \x1b[96m{b}\n", .{self.registers.flags.byte}) catch return Result.errStatic("Failed to allocate buffer");
+                writer.print("\x1b[0mr2/flg  = \x1b[96m{b:0>8}\n", .{self.registers.flags.byte}) catch return Result.errStatic("Failed to allocate buffer");
                 writer.print("\x1b[0mr3/seg  = \x1b[96m{d}\n", .{self.registers.segment}) catch return Result.errStatic("Failed to allocate buffer");
 
                 for(4..16) |i| {
@@ -346,6 +346,7 @@ pub const CPU = struct {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
 
         const mem_value = self.memory.get(address);
+        self.registers.accumulator = mem_value;
         
         if(flag_update == 1) {
             self.registers.flags.flags.carry = 0;
@@ -355,15 +356,14 @@ pub const CPU = struct {
             self.registers.flags.flags.sign = @truncate(mem_value >> 7);
         }
 
-        self.program_counter += 2;
+        self.program_counter += 1;
     }
 
     fn instrSt(self: *Self, operand: u4) void {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
-
         self.memory.set(address, self.registers.accumulator);
 
-        self.program_counter += 2;
+        self.program_counter += 1;
     }
 
     fn instrB(self: *Self, operand: u4) void {
@@ -389,7 +389,7 @@ pub const CPU = struct {
         };
 
         if(condition_met) {
-             self.program_counter = ((@as(u16, self.registers.segment) << 8) | (@as(u16, self.registers.accumulator)));
+            self.program_counter = ((@as(u16, self.registers.segment) << 8) | (@as(u16, self.registers.accumulator)));
         } else {
             self.program_counter += 1;
         }

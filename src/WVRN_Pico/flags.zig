@@ -1,12 +1,12 @@
 pub const FlagsRepr = packed struct {
-    always_true: u1,
-    a: u1,
-    b: u1,
-    parity: u1,
-    not_zero: u1,
-    sign: u1,
+    overflow: u1,
     carry: u1,
-    overflow: u1
+    sign: u1,
+    not_zero: u1,
+    parity: u1,
+    b: u1,
+    a: u1,
+    always_true: u1 = 1,
 };
 
 pub const Flags = packed union {
