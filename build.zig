@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
         .name = "wve",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
-        .optimize = .Debug,
+        .optimize = .ReleaseFast,
     });
 
     b.installArtifact(exe);

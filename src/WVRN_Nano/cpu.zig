@@ -68,8 +68,11 @@ pub const CPU = struct {
         }
     }
 
-    pub fn queryHelp() []const u8 {
+    pub fn getNextInstruction(self: Self, buffer: *std.ArrayList(u8)) Result {
+        _ = self;
+        _ = buffer;
 
+        return Result.ok();
     }
 
     pub fn setQuery(self: *Self, query: []const[]const u8) Result {

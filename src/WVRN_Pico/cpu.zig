@@ -41,15 +41,13 @@ pub const CPU = struct {
 
         const instr: Instruction = @bitCast(instr_byte);
 
-        std.debug.print("{}", .{instr});
-
         switch(instr.opcode) {
             .EXT  => self.instrExt(instr.operand),
-            .SWA  => self.instrSwa(instr.operand),
-            .ADD  => self.instrAdd(instr.operand),
-            .ADDI => self.instrAddi(instr.operand),
-            .NAND => self.instrNand(instr.operand),
-            .LD   => self.instrLd(instr.operand),
+            .SWA  => self.instrSwa(instr.operand, instr.flag_update),
+            .ADD  => self.instrAdd(instr.operand, instr.flag_update),
+            .ADDI => self.instrAddi(instr.operand, instr.flag_update),
+            .NAND => self.instrNand(instr.operand, instr.flag_update),
+            .LD   => self.instrLd(instr.operand, instr.flag_update),
             .ST   => self.instrSt(instr.operand),
             .B    => self.instrB(instr.operand),
         }
@@ -59,6 +57,43 @@ pub const CPU = struct {
         for(0..n) |_| {
             self.tick();
         }
+    }
+
+    pub fn getNextInstruction(self: Self, buffer: *std.ArrayList(u8)) Result {
+        const instr_byte = self.memory.get(self.program_counter);
+        const instr: Instruction = @bitCast(instr_byte);
+
+        var writer = buffer.writer();
+
+        switch(instr.opcode) {
+            .EXT  => writer.print("ext {d} {d}", .{instr.flag_update, instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .SWA  => writer.print("swa{s} r{d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .ADD  => writer.print("add{s} r{d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .ADDI => writer.print("addi{s} {d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .NAND => writer.print("nand{s} r{d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .LD   => writer.print("ld{s} r{d}", .{if(instr.flag_update == 1) ".f" else "", instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .ST   => writer.print("st {d}", .{instr.operand}) catch return Result.errStatic("Failed to allocate buffer"),
+            .B    => writer.print("b {s}", .{switch(instr.operand) {
+                0b0000 => "false",
+                0b0001 => "true",
+                0b0010 => "!a",
+                0b0011 => "a",
+                0b0100 => "!b",
+                0b0101 => "b",
+                0b0110 => "even",
+                0b0111 => "odd",
+                0b1000 => "!zero",
+                0b1001 => "zero",
+                0b1010 => "!sign",
+                0b1011 => "sign",
+                0b1100 => "!carry",
+                0b1101 => "carry",
+                0b1110 => "!overflow",
+                0b1111 => "overflow"
+            }}) catch return Result.errStatic("Failed to allocate buffer"),
+        }
+
+        return Result.ok();
     }
 
     pub fn setQuery(self: *Self, query: []const[]const u8) Result {
@@ -157,7 +192,7 @@ pub const CPU = struct {
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "flg")) {
                     const reg_value = self.registers.get(2);
-                    writer.print("flg= \x1b[96m{d}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
+                    writer.print("flg= \x1b[96m{b:0>8}\x1b[0m", .{reg_value}) catch return Result.errStatic("Failed to allocate buffer");
                     return Result.ok();
                 } else if(std.mem.eql(u8, reg_name, "seg")) {
                     const reg_value = self.registers.get(3);
@@ -185,7 +220,7 @@ pub const CPU = struct {
                 writer.print("\x1b[0mr2/flg  = \x1b[96m{b}\n", .{self.registers.flags.byte}) catch return Result.errStatic("Failed to allocate buffer");
                 writer.print("\x1b[0mr3/seg  = \x1b[96m{d}\n", .{self.registers.segment}) catch return Result.errStatic("Failed to allocate buffer");
 
-                for(4..28) |i| {
+                for(4..16) |i| {
                     writer.print("\x1b[0mr{d: <2} = \x1b[96m{d: <3}", .{i, self.registers.get(@intCast(i))}) catch return Result.errStatic("Failed to allocate buffer");
 
                     if(i % 4 == 3) {
@@ -253,61 +288,72 @@ pub const CPU = struct {
         }
     }
 
-    fn instrSwa(self: *Self, operand: u4) void {
+    fn instrSwa(self: *Self, operand: u4, flag_update: u1) void {
         const temp = self.registers.get(operand);
         self.registers.set(operand, self.registers.accumulator);
         self.registers.accumulator = temp;
 
+        if(flag_update == 1) {
+            self.registers.flags.flags.carry = 0;
+            self.registers.flags.flags.overflow = 0;
+            self.registers.flags.flags.not_zero = if(self.registers.accumulator == 0) 0 else 1;
+            self.registers.flags.flags.parity = @truncate(self.registers.accumulator);
+            self.registers.flags.flags.sign = @truncate(self.registers.accumulator >> 7);
+        }
+
         self.program_counter += 1;
     }
 
-    fn instrAdd(self: *Self, operand: u4) void {
+    fn instrAdd(self: *Self, operand: u4, flag_update: u1) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
             self.registers.get(operand),
             &self.registers.accumulator, 
-            &self.registers.flags
+            &self.registers.flags,
+            flag_update
         );
-
-        std.debug.print("\ncarry: {d}", .{self.registers.flags.flags.carry});
 
         self.program_counter += 1;
     }
 
-    fn instrAddi(self: *Self, operand: u4) void {
+    fn instrAddi(self: *Self, operand: u4, flag_update: u1) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
             bin_ops.signExtendu5u8(operand),
             &self.registers.accumulator, 
-            &self.registers.flags
+            &self.registers.flags,
+            flag_update
         );
 
         self.program_counter += 1;
     }
 
-    fn instrNand(self: *Self, operand: u4) void {
+    fn instrNand(self: *Self, operand: u4, flag_update: u1) void {
         const carry = self.registers.flags.flags.carry;
         bin_ops.nandWithFlags(
             self.registers.accumulator + @as(u8, carry),
             self.registers.get(operand),
             &self.registers.accumulator, 
-            &self.registers.flags
+            &self.registers.flags,
+            flag_update
         );
 
         self.program_counter += 1;
     }
 
 
-    fn instrLd(self: *Self, operand: u4) void {
+    fn instrLd(self: *Self, operand: u4, flag_update: u1) void {
         const address = ((@as(u16, self.registers.segment) << 8) | @as(u16, self.registers.get(operand)));
 
         const mem_value = self.memory.get(address);
         
-        self.registers.flags.flags.carry = 0;
-        self.registers.flags.flags.overflow = 0;
-        self.registers.flags.flags.not_zero = if(mem_value == 0) 0 else 1;
-        self.registers.flags.flags.parity = @truncate(mem_value);
-        self.registers.flags.flags.sign = @truncate(mem_value >> 7);
+        if(flag_update == 1) {
+            self.registers.flags.flags.carry = 0;
+            self.registers.flags.flags.overflow = 0;
+            self.registers.flags.flags.not_zero = if(mem_value == 0) 0 else 1;
+            self.registers.flags.flags.parity = @truncate(mem_value);
+            self.registers.flags.flags.sign = @truncate(mem_value >> 7);
+        }
 
         self.program_counter += 2;
     }
@@ -339,7 +385,7 @@ pub const CPU = struct {
             0b1100 => flags.carry == 0,
             0b1101 => flags.carry == 1,
             0b1110 => flags.overflow == 0,
-            0b1111 => flags.overflow == 1,
+            0b1111 => flags.overflow == 1
         };
 
         if(condition_met) {

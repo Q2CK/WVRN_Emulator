@@ -61,6 +61,13 @@ const CPU = union(CPUType) {
         }
     }
 
+    pub fn getNextInstruction(self: *Self, buffer: *std.ArrayList(u8)) Result {
+        return switch(self.*) {
+            .WVRN_Nano => |*cpu| return cpu.getNextInstruction(buffer),
+            .WVRN_Pico => |*cpu| return cpu.getNextInstruction(buffer)
+        };
+    }
+
     pub fn setQuery(self: *Self, query: []const[]const u8) Result {
         return switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.setQuery(query),
@@ -293,6 +300,13 @@ pub fn run() !void {
                 if(app_context.program_file) |_| {
                     app_context.cpu.tick();
                     try printReport(stdout, .Success, "Executed \x1b[96m1\x1b[0m clock cycle", .{});
+
+                    var buffer = std.ArrayList(u8).init(alloc);
+                    defer buffer.deinit();
+                    switch(app_context.cpu.getNextInstruction(&buffer)) {
+                        .Ok => try printReport(stdout, .Info, "Next instruction: {s}", .{buffer.items}),
+                        .Err => try printReport(stdout, .Error, "Failed to read next instruction", .{})
+                    }
                 } else {
                     try printReport(stdout, .Error, "No program file loaded", .{});
                 }
