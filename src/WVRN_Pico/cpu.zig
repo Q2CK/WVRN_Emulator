@@ -338,7 +338,7 @@ pub const CPU = struct {
     inline fn instrAddi(self: *Self, operand: u4, flag_update: u1) void {
         bin_ops.addWithFlags(
             self.registers.accumulator,
-            bin_ops.signExtendu5u8(operand),
+            bin_ops.signExtendu4u8(operand),
             &self.registers.accumulator, 
             &self.registers.flags,
             flag_update
@@ -348,9 +348,8 @@ pub const CPU = struct {
     }
 
     inline fn instrNand(self: *Self, operand: u4, flag_update: u1) void {
-        const carry = self.registers.flags.flags.carry;
         bin_ops.nandWithFlags(
-            self.registers.accumulator + @as(u8, carry),
+            self.registers.accumulator,
             self.registers.get(operand),
             &self.registers.accumulator, 
             &self.registers.flags,
