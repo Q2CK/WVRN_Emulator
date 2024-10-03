@@ -7,10 +7,12 @@ const Status = @import("cpu_status.zig").Status;
 
 const wvrn_nano = @import("WVRN_Nano/cpu.zig");
 const wvrn_pico = @import("WVRN_Pico/cpu.zig");
+const wvrn_pico_v2 = @import("WVRN_Pico_v2/cpu.zig");
 
 const CPUType = enum {
     WVRN_Nano,
-    WVRN_Pico
+    WVRN_Pico,
+    WVRN_Pico_v2
 };
 
 const CPU = union(CPUType) {
@@ -18,18 +20,21 @@ const CPU = union(CPUType) {
 
     WVRN_Nano: wvrn_nano.CPU,
     WVRN_Pico: wvrn_pico.CPU,
+    WVRN_Pico_v2: wvrn_pico_v2.CPU,
 
     pub fn init(cpu_type: CPUType) Self {
         return switch(cpu_type) {
             .WVRN_Nano => Self{ .WVRN_Nano = wvrn_nano.CPU.init() },
-            .WVRN_Pico => Self{ .WVRN_Pico = wvrn_pico.CPU.init() }
+            .WVRN_Pico => Self{ .WVRN_Pico = wvrn_pico.CPU.init() },
+            .WVRN_Pico_v2 => Self{ .WVRN_Pico_v2 = wvrn_pico_v2.CPU.init() }
         };
     }
 
     pub fn reset(self: *Self) void {
         switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.reset(),
-            .WVRN_Pico => |*cpu| cpu.reset()
+            .WVRN_Pico => |*cpu| cpu.reset(),
+            .WVRN_Pico_v2 => |*cpu| cpu.reset()
         }
     }
 
@@ -37,62 +42,71 @@ const CPU = union(CPUType) {
         switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.tick(),
             .WVRN_Pico => |*cpu| cpu.tick(),
+            .WVRN_Pico_v2 => |*cpu| cpu.tick(),
         }
     }
 
     pub fn nTicks(self: *Self, n: usize) void {
         switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.nTicks(n),
-            .WVRN_Pico => |*cpu| cpu.nTicks(n)
+            .WVRN_Pico => |*cpu| cpu.nTicks(n),
+            .WVRN_Pico_v2 => |*cpu| cpu.nTicks(n)
         }
     }
 
     pub fn setMemory(self: *Self, image: []const u8) void {
         switch(self.*) {
             .WVRN_Nano => |*cpu| @memcpy(cpu.memory[0..image.len], image),
-            .WVRN_Pico => |*cpu| @memcpy(cpu.memory[0..image.len], image)
+            .WVRN_Pico => |*cpu| @memcpy(cpu.memory[0..image.len], image),
+            .WVRN_Pico_v2 => |*cpu| @memcpy(cpu.memory[0..image.len], image),
         }
     }
 
     pub fn dumpMemory(self: Self) []const u8 {
         switch(self) {
             .WVRN_Nano => |cpu| cpu.memory.bytes,
-            .WVRN_Pico => |cpu| cpu.memory.bytes
+            .WVRN_Pico => |cpu| cpu.memory.bytes,
+            .WVRN_Pico_v2 => |cpu| cpu.memory.bytes,
         }
     }
 
     pub fn getNextInstruction(self: *Self, buffer: *std.ArrayList(u8)) Result {
         return switch(self.*) {
             .WVRN_Nano => |*cpu| return cpu.getNextInstruction(buffer),
-            .WVRN_Pico => |*cpu| return cpu.getNextInstruction(buffer)
+            .WVRN_Pico => |*cpu| return cpu.getNextInstruction(buffer),
+            .WVRN_Pico_v2 => |*cpu| return cpu.getNextInstruction(buffer)
         };
     }
 
     pub fn setQuery(self: *Self, query: []const[]const u8) Result {
         return switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.setQuery(query),
-            .WVRN_Pico => |*cpu| cpu.setQuery(query)
+            .WVRN_Pico => |*cpu| cpu.setQuery(query),
+            .WVRN_Pico_v2 => |*cpu| cpu.setQuery(query)
         };
     }
 
     pub fn getQuery(self: *Self, query: []const[]const u8, buffer: *std.ArrayList(u8)) Result {
         return switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.getQuery(query, buffer),
-            .WVRN_Pico => |*cpu| cpu.getQuery(query, buffer)
+            .WVRN_Pico => |*cpu| cpu.getQuery(query, buffer),
+            .WVRN_Pico_v2 => |*cpu| cpu.getQuery(query, buffer)
         };
     }
 
     pub fn setStatus(self: *Self, status: Status) void {
         switch(self.*) {
             .WVRN_Nano => |*cpu| cpu.status = status,
-            .WVRN_Pico => |*cpu| cpu.status = status
+            .WVRN_Pico => |*cpu| cpu.status = status,
+            .WVRN_Pico_v2 => |*cpu| cpu.status = status
         }
     }
 
     pub fn getStatus(self: Self) Status {
         return switch(self) {
             .WVRN_Nano => |cpu| cpu.status,
-            .WVRN_Pico => |cpu| cpu.status
+            .WVRN_Pico => |cpu| cpu.status,
+            .WVRN_Pico_v2 => |cpu| cpu.status
         };
     }
 
@@ -103,6 +117,10 @@ const CPU = union(CPUType) {
                 @memcpy(cpu.memory.bytes[0..copy_len], program[0..copy_len]);
             },
             .WVRN_Pico => |*cpu| {
+                const copy_len = @min(cpu.memory.bytes.len, program.len);
+                @memcpy(cpu.memory.bytes[0..copy_len], program[0..copy_len]);
+            },
+            .WVRN_Pico_v2 => |*cpu| {
                 const copy_len = @min(cpu.memory.bytes.len, program.len);
                 @memcpy(cpu.memory.bytes[0..copy_len], program[0..copy_len]);
             }
@@ -278,7 +296,11 @@ pub fn run() !void {
             }
         } else if(std.mem.eql(u8, command, "cpu")) {
             if(params.len == 0) {
-                
+                try stdout.print("\x1b[0mAvailable cpus:\n\n", .{});
+                inline for(@typeInfo(CPUType).Enum.fields) |field| {
+                    try stdout.print("    {s}\n", .{field.name});
+                }
+                try stdout.print("\n", .{});
             } else if(params.len == 1) {
                 const cpu_type: CPUType = cpu_types: inline for(@typeInfo(CPUType).Enum.fields) |field| {
                     if(std.mem.eql(u8, field.name, params[0])) {
