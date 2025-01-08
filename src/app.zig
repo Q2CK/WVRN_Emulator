@@ -197,7 +197,7 @@ pub fn run() !void {
     var app_context = AppContext{
         .program_file_path = null,
         .program_file = null,
-        .cpu = CPU.init(.WVRN_Pico)
+        .cpu = CPU.init(.WVRN_Pico_v2)
     };
 
     try stdout.print("\n\x1b[0m\x1b[96mWVRN Emulator\x1b[0m | Q2CK\n\n", .{});
