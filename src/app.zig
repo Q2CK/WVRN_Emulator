@@ -359,9 +359,26 @@ pub fn run() !void {
                     try printReport(stdout, .Success, "Executed \x1b[96m{}\x1b[0m clock cycle(s)", .{cycle_counter});
                 } else {
                     try printReport(stdout, .Error, "No program file loaded", .{});
-                } 
+                }
+            } else if(params.len == 1) {
+                const n_runs = std.fmt.parseInt(usize, params[0], 0) catch 0;
+                if(n_runs == 0) {
+                    try printReport(stdout, .Error, "Failed to parse number of runs", .{});
+                }
+                for(0..n_runs) |_| {
+                    if(app_context.program_file) |_| {
+                        app_context.cpu.setStatus(.Run);
+                        while(app_context.cpu.getStatus() == .Run) {
+                            app_context.cpu.tick();
+                            cycle_counter += 1;
+                        }
+                        try printReport(stdout, .Success, "Executed \x1b[96m{}\x1b[0m clock cycle(s)", .{cycle_counter});
+                    } else {
+                        try printReport(stdout, .Error, "No program file loaded", .{});
+                    }
+                }
             } else {
-                try printReport(stdout, .Error, "Expected 0 parameters, got {d}", .{params.len});
+                try printReport(stdout, .Error, "Expected 0 or 1 parameter(s), got {d}", .{params.len});
                 continue :main_loop;
             }
         } else if(std.mem.eql(u8, command, "reset")) {
