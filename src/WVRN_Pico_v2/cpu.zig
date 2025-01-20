@@ -43,6 +43,7 @@ pub const CPU = struct {
 
         switch(instr.opcode) {
             .EXT    => self.instrExt(instr.operand),
+            .EXT2   => self.instrExt2(instr.operand),
             .STA    => self.instrSta(instr.operand),
             .LDA    => self.instrLda(instr.operand, 0),
             .LDA_f  => self.instrLda(instr.operand, 1),
@@ -74,6 +75,7 @@ pub const CPU = struct {
 
         const result = switch(instr.opcode) {
             .EXT     => writer.print("ext {d}",     .{instr.operand}),
+            .EXT2    => writer.print("ext2 {d}",    .{instr.operand}),
             .STA     => writer.print("sta {d}",     .{instr.operand}),
             .LDA     => writer.print("lda r{d}",    .{instr.operand}),
             .LDA_f   => writer.print("lda.f r{d}",  .{instr.operand}),
@@ -320,6 +322,11 @@ pub const CPU = struct {
         } else {
             self.status = .Halt;
         }
+    }
+
+    inline fn instrExt2(self: *Self, operand: u4) void {
+        _ = self;
+        _ = operand;
     }
 
     inline fn instrSta(self: *Self, operand: u4) void {

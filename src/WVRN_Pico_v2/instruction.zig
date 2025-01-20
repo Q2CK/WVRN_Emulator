@@ -1,5 +1,6 @@
 pub const Opcode = enum(u4) {
     EXT    = 0b1000,
+    EXT2   = 0b1110,
     STA    = 0b0000,
     LDA    = 0b0001,
     LDA_f  = 0b1001,
@@ -11,7 +12,7 @@ pub const Opcode = enum(u4) {
     NAND_f = 0b1100,
     LD     = 0b0101,
     LD_f   = 0b1101,
-    ST     = 0b1110,
+    ST     = 0b0110,
     B      = 0b0111,
     B_h    = 0b1111
 };
